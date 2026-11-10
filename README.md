@@ -1,4 +1,4 @@
-# NetPulse — Prototipo 1 (Odoo 17 Community, low-code)
+# NetPulse — Prototipo 1 
 
 Ingeniería de Software II (2016702) · Universidad Nacional de Colombia · Sede Bogotá · 2026-II
 
