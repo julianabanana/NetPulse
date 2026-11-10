@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="netpulse_incident_view_tree" model="ir.ui.view">
+        <field name="name">netpulse.incident.tree</field>
+        <field name="model">netpulse.incident</field>
+        <field name="arch" type="xml">
+            <tree decoration-danger="is_open and priority == '2'" decoration-muted="state == 'resolved'">
+                <field name="is_open" column_invisible="1"/>
+                <field name="name"/>
+                <field name="device_id"/>
+                <field name="root_cause"/>
+                <field name="priority" widget="badge"
+                       decoration-danger="priority == '2'"
+                       decoration-warning="priority == '1'"
+                       decoration-info="priority == '0'"/>
+                <field name="state" widget="badge"
+                       decoration-warning="state == 'pending'"
+                       decoration-info="state == 'in_progress'"
+                       decoration-success="state == 'resolved'"/>
+                <field name="technician_id"/>
+                <field name="origin"/>
+                <field name="date_detected"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="netpulse_incident_view_form" model="ir.ui.view">
+        <field name="name">netpulse.incident.form</field>
+        <field name="model">netpulse.incident</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_start" type="object" string="Iniciar atención"
+                            class="btn-primary" invisible="state != 'pending'"/>
+                    <button name="action_resolve" type="object" string="Marcar resuelta"
+                            class="btn-primary" invisible="state != 'in_progress'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="pending,in_progress,resolved"/>
+                </header>
+                <sheet>
+                    <field name="is_admin" invisible="1"/>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                        <h2><field name="root_cause" placeholder="Causa raíz (ej. Switch SW2 offline)"/></h2>
+                    </div>
+                    <group>
+                        <group string="Diagnóstico">
+                            <field name="device_id" readonly="id"/>
+                            <field name="device_status" widget="badge"
+                                   decoration-success="device_status == 'up'"
+                                   decoration-danger="device_status == 'down'"
+                                   decoration-warning="device_status == 'unknown'"/>
+                            <field name="origin" readonly="not is_admin or id"/>
+                            <field name="date_detected"/>
+                        </group>
+                        <group string="Gestión">
+                            <field name="priority" readonly="not is_admin"/>
+                            <field name="technician_id" readonly="not is_admin"/>
+                            <field name="date_resolved"/>
+                        </group>
+                    </group>
+                    <group string="Descripción">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="netpulse_incident_view_kanban" model="ir.ui.view">
+        <field name="name">netpulse.incident.kanban</field>
+        <field name="model">netpulse.incident</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state" group_create="false" group_delete="false"
+                    group_edit="false" records_draggable="false" quick_create="false">
+                <field name="priority"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div class="oe_kanban_global_click">
+                            <div class="oe_kanban_details">
+                                <strong><field name="name"/></strong> · <field name="device_id"/>
+                                <div><field name="root_cause"/></div>
+                                <div>
+                                    <field name="priority" widget="badge"
+                                           decoration-danger="priority == '2'"
+                                           decoration-warning="priority == '1'"
+                                           decoration-info="priority == '0'"/>
+                                </div>
+                                <div class="text-muted"><field name="technician_id"/></div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="netpulse_incident_view_search" model="ir.ui.view">
+        <field name="name">netpulse.incident.search</field>
+        <field name="model">netpulse.incident</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="device_id"/>
+                <field name="technician_id"/>
+                <field name="root_cause"/>
+                <filter name="f_pending" string="Pendientes" domain="[('state', '=', 'pending')]"/>
+                <filter name="f_progress" string="En proceso" domain="[('state', '=', 'in_progress')]"/>
+                <filter name="f_resolved" string="Resueltas" domain="[('state', '=', 'resolved')]"/>
+                <separator/>
+                <filter name="f_high" string="Prioridad alta" domain="[('priority', '=', '2')]"/>
+                <filter name="f_mine" string="Mis incidencias" domain="[('technician_id', '=', uid)]"/>
+                <filter name="f_unassigned" string="Sin técnico" domain="[('technician_id', '=', False)]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="g_state" string="Estado" context="{'group_by': 'state'}"/>
+                    <filter name="g_priority" string="Prioridad" context="{'group_by': 'priority'}"/>
+                    <filter name="g_device" string="Dispositivo" context="{'group_by': 'device_id'}"/>
+                    <filter name="g_tech" string="Técnico" context="{'group_by': 'technician_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="netpulse_incident_view_graph" model="ir.ui.view">
+        <field name="name">netpulse.incident.graph</field>
+        <field name="model">netpulse.incident</field>
+        <field name="arch" type="xml">
+            <graph string="Incidencias por prioridad" type="bar">
+                <field name="priority"/>
+                <field name="state"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="netpulse_incident_view_pivot" model="ir.ui.view">
+        <field name="name">netpulse.incident.pivot</field>
+        <field name="model">netpulse.incident</field>
+        <field name="arch" type="xml">
+            <pivot string="Incidencias">
+                <field name="device_id" type="row"/>
+                <field name="state" type="col"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="action_netpulse_incident" model="ir.actions.act_window">
+        <field name="name">Bandeja de incidencias</field>
+        <field name="res_model">netpulse.incident</field>
+        <field name="view_mode">tree,kanban,form,graph,pivot</field>
+        <field name="search_view_id" ref="netpulse_incident_view_search"/>
+        <field name="context">{'search_default_f_pending': 1}</field>
+    </record>
+
+    <record id="action_netpulse_incident_mine" model="ir.actions.act_window">
+        <field name="name">Mis incidencias</field>
+        <field name="res_model">netpulse.incident</field>
+        <field name="view_mode">tree,kanban,form</field>
+        <field name="domain">[('technician_id', '=', uid)]</field>
+        <field name="search_view_id" ref="netpulse_incident_view_search"/>
+    </record>
+</odoo>

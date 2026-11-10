@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_netpulse_root" name="NetPulse" sequence="10"
+              groups="group_netpulse_technician"/>
+
+    <menuitem id="menu_netpulse_dashboard" name="Dashboard" parent="menu_netpulse_root"
+              action="action_netpulse_dashboard" sequence="10" groups="group_netpulse_admin"/>
+    <menuitem id="menu_netpulse_topology" name="Topología" parent="menu_netpulse_root"
+              action="action_netpulse_topology" sequence="20" groups="group_netpulse_admin"/>
+
+    <menuitem id="menu_netpulse_incidents" name="Incidencias" parent="menu_netpulse_root"
+              sequence="30"/>
+    <menuitem id="menu_netpulse_incident_inbox" name="Bandeja de incidencias"
+              parent="menu_netpulse_incidents" action="action_netpulse_incident" sequence="10"/>
+    <menuitem id="menu_netpulse_incident_mine" name="Mis incidencias"
+              parent="menu_netpulse_incidents" action="action_netpulse_incident_mine" sequence="20"/>
+
+    <menuitem id="menu_netpulse_devices" name="Dispositivos" parent="menu_netpulse_root"
+              action="action_netpulse_device" sequence="40"/>
+
+    <menuitem id="menu_netpulse_config" name="Configuración" parent="menu_netpulse_root"
+              sequence="90" groups="group_netpulse_admin"/>
+    <menuitem id="menu_netpulse_sync" name="Sincronizar con GNS3" parent="menu_netpulse_config"
+              action="action_netpulse_sync_gns3" sequence="10"/>
+</odoo>

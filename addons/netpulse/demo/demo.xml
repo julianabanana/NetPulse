@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Datos de demostración. El usuario técnico NO trae contraseña: asígnela
+         desde Ajustes > Usuarios > Acción > Cambiar contraseña. -->
+    <record id="demo_user_technician" model="res.users">
+        <field name="name">Técnico Demo</field>
+        <field name="login">tecnico@netpulse.local</field>
+        <field name="email">tecnico@netpulse.local</field>
+        <field name="groups_id" eval="[(6, 0, [ref('base.group_user'), ref('netpulse.group_netpulse_technician')])]"/>
+    </record>
+
+    <record id="demo_dev_r1" model="netpulse.device">
+        <field name="name">R1</field><field name="device_type">router</field>
+        <field name="criticality">critical</field><field name="status">up</field>
+    </record>
+    <record id="demo_dev_sw1" model="netpulse.device">
+        <field name="name">SW1</field><field name="device_type">switch</field>
+        <field name="criticality">critical</field><field name="status">up</field>
+    </record>
+    <record id="demo_dev_sw2" model="netpulse.device">
+        <field name="name">SW2</field><field name="device_type">switch</field>
+        <field name="criticality">critical</field><field name="status">up</field>
+    </record>
+    <record id="demo_dev_sw3" model="netpulse.device">
+        <field name="name">SW3</field><field name="device_type">switch</field>
+        <field name="criticality">normal</field><field name="status">up</field>
+    </record>
+    <record id="demo_dev_r2" model="netpulse.device">
+        <field name="name">R2</field><field name="device_type">router</field>
+        <field name="criticality">normal</field><field name="status">unknown</field>
+    </record>
+</odoo>

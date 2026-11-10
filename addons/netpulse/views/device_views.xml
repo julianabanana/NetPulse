@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Lista -->
+    <record id="netpulse_device_view_tree" model="ir.ui.view">
+        <field name="name">netpulse.device.tree</field>
+        <field name="model">netpulse.device</field>
+        <field name="arch" type="xml">
+            <tree decoration-danger="status == 'down'" decoration-muted="status == 'unknown'">
+                <field name="name"/>
+                <field name="device_type"/>
+                <field name="criticality"/>
+                <field name="status" widget="badge"
+                       decoration-success="status == 'up'"
+                       decoration-danger="status == 'down'"
+                       decoration-warning="status == 'unknown'"/>
+                <field name="last_seen"/>
+                <field name="open_incident_count"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Formulario -->
+    <record id="netpulse_device_view_form" model="ir.ui.view">
+        <field name="name">netpulse.device.form</field>
+        <field name="model">netpulse.device</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_simulate_down" type="object" string="Simular caída (demo)"
+                            class="btn-danger" groups="netpulse.group_netpulse_admin"
+                            invisible="status == 'down'"/>
+                    <button name="action_simulate_up" type="object" string="Simular recuperación (demo)"
+                            class="btn-success" groups="netpulse.group_netpulse_admin"
+                            invisible="status == 'up'"/>
+                    <field name="status" widget="statusbar" statusbar_visible="up,down,unknown"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Ej. SW2"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="device_type"/>
+                            <field name="criticality"/>
+                            <field name="gns3_node_id"/>
+                        </group>
+                        <group>
+                            <field name="last_seen"/>
+                            <field name="open_incident_count"/>
+                            <field name="active" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Incidencias" name="incidents">
+                            <field name="incident_ids" readonly="1">
+                                <tree>
+                                    <field name="name"/>
+                                    <field name="root_cause"/>
+                                    <field name="priority"/>
+                                    <field name="state"/>
+                                    <field name="technician_id"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <!-- Búsqueda -->
+    <record id="netpulse_device_view_search" model="ir.ui.view">
+        <field name="name">netpulse.device.search</field>
+        <field name="model">netpulse.device</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <filter name="f_critical" string="Críticos" domain="[('criticality', '=', 'critical')]"/>
+                <filter name="f_down" string="Caídos" domain="[('status', '=', 'down')]"/>
+                <filter name="f_up" string="Activos" domain="[('status', '=', 'up')]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="g_status" string="Estado" context="{'group_by': 'status'}"/>
+                    <filter name="g_type" string="Tipo" context="{'group_by': 'device_type'}"/>
+                    <filter name="g_criticality" string="Criticidad" context="{'group_by': 'criticality'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Kanban de topología: tarjetas verde/rojo agrupadas por tipo -->
+    <record id="netpulse_device_view_kanban_topology" model="ir.ui.view">
+        <field name="name">netpulse.device.kanban.topology</field>
+        <field name="model">netpulse.device</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="device_type" group_create="false" group_delete="false"
+                    group_edit="false" records_draggable="false" quick_create="false">
+                <field name="color"/>
+                <field name="status"/>
+                <field name="criticality"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div t-attf-class="#{kanban_color(record.color.raw_value)} oe_kanban_global_click">
+                            <div class="oe_kanban_details">
+                                <strong><field name="name"/></strong>
+                                <div>
+                                    <field name="status" widget="badge"
+                                           decoration-success="status == 'up'"
+                                           decoration-danger="status == 'down'"
+                                           decoration-warning="status == 'unknown'"/>
+                                </div>
+                                <div t-if="record.criticality.raw_value == 'critical'" class="text-danger">
+                                    <i class="fa fa-exclamation-triangle"/> Crítico
+                                </div>
+                                <div class="text-muted">
+                                    Incidencias abiertas: <field name="open_incident_count"/>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- Kanban del dashboard: columnas Caído / Activo con contadores -->
+    <record id="netpulse_device_view_kanban_dashboard" model="ir.ui.view">
+        <field name="name">netpulse.device.kanban.dashboard</field>
+        <field name="model">netpulse.device</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="status" group_create="false" group_delete="false"
+                    group_edit="false" records_draggable="false" quick_create="false">
+                <field name="color"/>
+                <field name="criticality"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div t-attf-class="#{kanban_color(record.color.raw_value)} oe_kanban_global_click">
+                            <div class="oe_kanban_details">
+                                <strong><field name="name"/></strong>
+                                <div><field name="device_type"/></div>
+                                <div t-if="record.criticality.raw_value == 'critical'" class="text-danger">
+                                    <i class="fa fa-exclamation-triangle"/> Crítico
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="netpulse_device_view_graph" model="ir.ui.view">
+        <field name="name">netpulse.device.graph</field>
+        <field name="model">netpulse.device</field>
+        <field name="arch" type="xml">
+            <graph string="Dispositivos por estado" type="pie">
+                <field name="status"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="netpulse_device_view_pivot" model="ir.ui.view">
+        <field name="name">netpulse.device.pivot</field>
+        <field name="model">netpulse.device</field>
+        <field name="arch" type="xml">
+            <pivot string="Dispositivos">
+                <field name="device_type" type="row"/>
+                <field name="status" type="col"/>
+            </pivot>
+        </field>
+    </record>
+
+    <!-- Acciones -->
+    <record id="action_netpulse_dashboard" model="ir.actions.act_window">
+        <field name="name">Dashboard</field>
+        <field name="res_model">netpulse.device</field>
+        <field name="view_mode">kanban,graph,pivot</field>
+        <field name="view_id" ref="netpulse_device_view_kanban_dashboard"/>
+        <field name="search_view_id" ref="netpulse_device_view_search"/>
+    </record>
+
+    <record id="action_netpulse_topology" model="ir.actions.act_window">
+        <field name="name">Topología de red</field>
+        <field name="res_model">netpulse.device</field>
+        <field name="view_mode">kanban,tree,form</field>
+        <field name="view_id" ref="netpulse_device_view_kanban_topology"/>
+        <field name="search_view_id" ref="netpulse_device_view_search"/>
+    </record>
+
+    <record id="action_netpulse_device" model="ir.actions.act_window">
+        <field name="name">Dispositivos</field>
+        <field name="res_model">netpulse.device</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="netpulse_device_view_search"/>
+    </record>
+
+    <record id="action_netpulse_sync_gns3" model="ir.actions.server">
+        <field name="name">Sincronizar con GNS3</field>
+        <field name="model_id" ref="model_netpulse_device"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_sync_gns3()</field>
+    </record>
+</odoo>

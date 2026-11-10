@@ -1,0 +1,19 @@
+# Secretos y entorno
+.env
+*.pem
+*.key
+# Python / Odoo
+__pycache__/
+*.pyc
+*.pyo
+filestore/
+*.log
+# Datos locales
+pgdata/
+odoo-data/
+# IDE / SO
+.vscode/
+.idea/
+.DS_Store
+# Postman: nunca versionar entornos con llaves reales
+postman/*.local.json

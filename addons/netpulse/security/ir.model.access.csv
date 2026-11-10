@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_netpulse_device_technician,netpulse.device technician,model_netpulse_device,group_netpulse_technician,1,0,0,0
+access_netpulse_device_admin,netpulse.device admin,model_netpulse_device,group_netpulse_admin,1,1,1,1
+access_netpulse_incident_technician,netpulse.incident technician,model_netpulse_incident,group_netpulse_technician,1,1,1,0
+access_netpulse_incident_admin,netpulse.incident admin,model_netpulse_incident,group_netpulse_admin,1,1,1,1

@@ -1,0 +1,336 @@
+openapi: 3.0.3
+info:
+  title: NetPulse API (Odoo 17 - API externa JSON-RPC)
+  version: 1.0.0
+  description: |
+    API del MVP de NetPulse, expuesta por la API externa de Odoo 17 Community.
+
+    **Particularidades de Odoo (documentadas honestamente):**
+    - Todas las operaciones usan un único endpoint `POST /jsonrpc` (JSON-RPC 2.0). Lo que cambia es `params.service`, `params.method` y `params.args`.
+    - Las respuestas viajan con HTTP 200 incluso cuando hay error; el error está en el cuerpo (`error.data.name`).
+    - Equivalencias: `odoo.exceptions.AccessDenied` ≈ 401 (no autenticado), `odoo.exceptions.AccessError` ≈ 403 (sin permiso), `odoo.exceptions.ValidationError` ≈ 400 (datos inválidos).
+    - La credencial es una **API key** de Odoo (se crea en Preferencias > Seguridad de la cuenta). En JSON-RPC se envía como argumento `password`/`api_key` dentro de `params.args`; el esquema `bearerAuth` se declara para documentar ese uso (en versiones nuevas de Odoo se envía como `Authorization: Bearer`).
+    - Las contraseñas y las API keys se almacenan con hash en Odoo.
+servers:
+  - url: http://localhost:8069
+    description: Desarrollo local (Docker)
+  - url: https://netpulse.example.com
+    description: Producción (solo HTTPS, detrás de proxy inverso)
+tags:
+  - name: Salud
+  - name: Autenticación
+  - name: Dispositivos
+  - name: Incidencias
+paths:
+  /web/health:
+    get:
+      tags: [Salud]
+      summary: Verifica que el servidor esté arriba
+      operationId: health
+      security: []
+      responses:
+        '200':
+          description: Servidor operativo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: pass
+  /jsonrpc:
+    post:
+      tags: [Autenticación, Dispositivos, Incidencias]
+      summary: Punto único de la API (JSON-RPC 2.0)
+      description: |
+        Operaciones del MVP según el valor de `params.service` / `params.method`:
+
+        | Operación | service | method | Rol |
+        |---|---|---|---|
+        | Login | common | authenticate | cualquiera |
+        | Crear/leer/actualizar/eliminar dispositivos | object | execute_kw (`create`, `search_read`, `write`, `unlink` sobre `netpulse.device`) | leer: técnico y admin; escribir: admin |
+        | Crear/leer/actualizar incidencias | object | execute_kw (sobre `netpulse.incident`) | técnico: solo las suyas, sin cambiar técnico/prioridad; admin: todo; eliminar: admin |
+      operationId: jsonrpc
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JsonRpcRequest'
+            examples:
+              login:
+                summary: Iniciar sesión (devuelve el uid)
+                value:
+                  jsonrpc: '2.0'
+                  method: call
+                  params:
+                    service: common
+                    method: authenticate
+                    args: [netpulse, admin, API_KEY_DE_EJEMPLO, {}]
+                  id: 1
+              crearDispositivo:
+                summary: Crear dispositivo (solo administrador)
+                value:
+                  jsonrpc: '2.0'
+                  method: call
+                  params:
+                    service: object
+                    method: execute_kw
+                    args:
+                      - netpulse
+                      - 2
+                      - API_KEY_DE_EJEMPLO
+                      - netpulse.device
+                      - create
+                      - - name: SW2
+                          device_type: switch
+                          criticality: critical
+                          gns3_node_id: 5f1c1b7e-0000-0000-0000-000000000000
+                      - {}
+                  id: 1
+              leerDispositivos:
+                summary: Listar dispositivos caídos
+                value:
+                  jsonrpc: '2.0'
+                  method: call
+                  params:
+                    service: object
+                    method: execute_kw
+                    args:
+                      - netpulse
+                      - 2
+                      - API_KEY_DE_EJEMPLO
+                      - netpulse.device
+                      - search_read
+                      - - - [status, '=', down]
+                      - fields: [name, status, criticality, last_seen]
+                  id: 1
+              actualizarDispositivo:
+                summary: Actualizar dispositivo (solo administrador)
+                value:
+                  jsonrpc: '2.0'
+                  method: call
+                  params:
+                    service: object
+                    method: execute_kw
+                    args: [netpulse, 2, API_KEY_DE_EJEMPLO, netpulse.device, write, [[7], {criticality: normal}], {}]
+                  id: 1
+              eliminarDispositivo:
+                summary: Eliminar dispositivo (solo administrador)
+                value:
+                  jsonrpc: '2.0'
+                  method: call
+                  params:
+                    service: object
+                    method: execute_kw
+                    args: [netpulse, 2, API_KEY_DE_EJEMPLO, netpulse.device, unlink, [[7]], {}]
+                  id: 1
+              crearIncidencia:
+                summary: Crear incidencia manual o asignada
+                value:
+                  jsonrpc: '2.0'
+                  method: call
+                  params:
+                    service: object
+                    method: execute_kw
+                    args:
+                      - netpulse
+                      - 2
+                      - API_KEY_DE_EJEMPLO
+                      - netpulse.incident
+                      - create
+                      - - device_id: 7
+                          technician_id: 6
+                          priority: '2'
+                          root_cause: Switch SW2 offline
+                      - {}
+                  id: 1
+              leerIncidencias:
+                summary: Bandeja de incidencias pendientes
+                value:
+                  jsonrpc: '2.0'
+                  method: call
+                  params:
+                    service: object
+                    method: execute_kw
+                    args:
+                      - netpulse
+                      - 2
+                      - API_KEY_DE_EJEMPLO
+                      - netpulse.incident
+                      - search_read
+                      - - - [state, '=', pending]
+                      - fields: [name, device_id, priority, state, technician_id, root_cause]
+                  id: 1
+              cambiarEstado:
+                summary: Cambiar estado (Pendiente -> En proceso -> Resuelta)
+                value:
+                  jsonrpc: '2.0'
+                  method: call
+                  params:
+                    service: object
+                    method: execute_kw
+                    args: [netpulse, 6, API_KEY_DE_EJEMPLO, netpulse.incident, write, [[12], {state: in_progress}], {}]
+                  id: 1
+              eliminarIncidencia:
+                summary: Eliminar incidencia (solo administrador)
+                value:
+                  jsonrpc: '2.0'
+                  method: call
+                  params:
+                    service: object
+                    method: execute_kw
+                    args: [netpulse, 2, API_KEY_DE_EJEMPLO, netpulse.incident, unlink, [[12]], {}]
+                  id: 1
+      responses:
+        '200':
+          description: |
+            Respuesta JSON-RPC. Si la operación falla, `error` está presente (aun con HTTP 200).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonRpcResponse'
+              examples:
+                loginOk:
+                  summary: Login correcto
+                  value: {jsonrpc: '2.0', id: 1, result: 2}
+                loginFallido:
+                  summary: Login con credenciales inválidas (authenticate devuelve false)
+                  value: {jsonrpc: '2.0', id: 1, result: false}
+                lecturaOk:
+                  summary: search_read de incidencias
+                  value:
+                    jsonrpc: '2.0'
+                    id: 1
+                    result:
+                      - id: 12
+                        name: INC-0001
+                        device_id: [7, SW2]
+                        priority: '2'
+                        state: pending
+                        technician_id: false
+                        root_cause: SW2 offline
+                sinCredencial:
+                  summary: API key inválida (≈401)
+                  value:
+                    jsonrpc: '2.0'
+                    id: 1
+                    error:
+                      code: 200
+                      message: Odoo Server Error
+                      data: {name: odoo.exceptions.AccessDenied, message: Access Denied}
+                sinPermiso:
+                  summary: Rol insuficiente (≈403)
+                  value:
+                    jsonrpc: '2.0'
+                    id: 1
+                    error:
+                      code: 200
+                      message: Odoo Server Error
+                      data: {name: odoo.exceptions.AccessError, message: No tiene permiso para esta operación.}
+                datosInvalidos:
+                  summary: Datos inválidos o transición no permitida (≈400)
+                  value:
+                    jsonrpc: '2.0'
+                    id: 1
+                    error:
+                      code: 200
+                      message: Odoo Server Error
+                      data: {name: odoo.exceptions.ValidationError, message: 'Transición no permitida: En proceso -> Pendiente.'}
+        '400':
+          description: Cuerpo que no es JSON-RPC válido.
+        '404':
+          description: Ruta inexistente.
+        '500':
+          description: Error interno del servidor (sin trazas en producción).
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Odoo API key
+      description: |
+        API key de Odoo. Se genera en Preferencias > Seguridad de la cuenta > Nueva clave de API.
+        En JSON-RPC viaja en `params.args` (argumento de contraseña). Nunca se versiona en el repositorio.
+  schemas:
+    JsonRpcRequest:
+      type: object
+      required: [jsonrpc, method, params]
+      properties:
+        jsonrpc:
+          type: string
+          enum: ['2.0']
+        method:
+          type: string
+          enum: [call]
+        id:
+          type: integer
+          example: 1
+        params:
+          type: object
+          required: [service, method, args]
+          properties:
+            service:
+              type: string
+              enum: [common, object]
+            method:
+              type: string
+              enum: [authenticate, execute_kw]
+            args:
+              type: array
+              description: |
+                authenticate: [db, login, api_key, {}].
+                execute_kw: [db, uid, api_key, modelo, método, [args], {kwargs}].
+              items: {}
+    JsonRpcResponse:
+      type: object
+      properties:
+        jsonrpc:
+          type: string
+        id:
+          type: integer
+        result:
+          description: Resultado de la operación (uid, ids, registros, booleano).
+        error:
+          $ref: '#/components/schemas/JsonRpcError'
+    JsonRpcError:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            name:
+              type: string
+              example: odoo.exceptions.AccessError
+            message:
+              type: string
+    Device:
+      type: object
+      properties:
+        id: {type: integer}
+        name: {type: string, example: SW2}
+        device_type: {type: string, enum: [router, switch, other]}
+        criticality: {type: string, enum: [critical, normal]}
+        status: {type: string, enum: [down, up, unknown]}
+        gns3_node_id: {type: string}
+        last_seen: {type: string, format: date-time}
+    Incident:
+      type: object
+      properties:
+        id: {type: integer}
+        name: {type: string, example: INC-0001}
+        device_id: {type: integer}
+        priority: {type: string, enum: ['0', '1', '2'], description: '0 Baja, 1 Media, 2 Alta'}
+        state: {type: string, enum: [pending, in_progress, resolved]}
+        technician_id: {type: integer}
+        root_cause: {type: string}
+        origin: {type: string, enum: [auto, manual]}
+        date_detected: {type: string, format: date-time}
+        date_resolved: {type: string, format: date-time}
