@@ -11,7 +11,7 @@ asigna a un técnico y el técnico la lleva de *Pendiente → En proceso → Res
 ## Enlaces
 - Wireframes (Figma, solo lectura): https://www.figma.com/design/Z7XpwDRNMefjx80Mwmpafs/Wireframe-NetPulse?node-id=1-8401&t=YOqq5XuvQFGRLyLy-1
 - Documentación de la API: [`docs/openapi.yaml`](docs/openapi.yaml) (pegar en https://editor.swagger.io)
-- Tablero (GitHub Projects): _pegar enlace_
+- Tablero (GitHub Projects): [`Git-project`](https://github.com/users/Fmoram/projects/2)
 - Documento PDF del Prototipo 1: _pegar enlace / ver entrega_
 
 ## Tecnologías
