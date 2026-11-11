@@ -98,7 +98,3 @@ postman/           colección y environment (sin llaves)
 scripts/           monitor alterno vía API externa
 docker-compose.yml · .env.example · .gitignore
 ```
-
-## Trabajo en equipo
-Ramas por historia de usuario (`feature/hu-03-ticket-automatico`), *pull requests* revisados por otro integrante
-y commits descriptivos de todos. Acceso otorgado al profesor.
