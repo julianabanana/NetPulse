@@ -9,10 +9,10 @@ NetPulse conecta el monitoreo de red (GNS3) con la gestión de incidencias (Odoo
 asigna a un técnico y el técnico la lleva de *Pendiente → En proceso → Resuelta*.
 
 ## Enlaces
-- Wireframes (Figma, solo lectura): https://www.figma.com/design/Z7XpwDRNMefjx80Mwmpafs/Wireframe-NetPulse?node-id=1-8401&t=YOqq5XuvQFGRLyLy-1
+- Wireframes (Figma, solo lectura): [Wireframes](https://www.figma.com/design/Z7XpwDRNMefjx80Mwmpafs/Wireframe-NetPulse?node-id=0-1&t=L85pH1zrQ5Nr9IPm-1)
 - Documentación de la API: [`docs/openapi.yaml`](docs/openapi.yaml) (pegar en https://editor.swagger.io)
 - Tablero (GitHub Projects): [`Git-project`](https://github.com/users/Fmoram/projects/2)
-- Documento PDF del Prototipo 1: _pegar enlace / ver entrega_
+- Documento PDF del Prototipo 1: Raíz del repositorio
 
 ## Tecnologías
 Odoo 17 Community (Python, ORM, vistas XML) · PostgreSQL 15 · Docker Compose · GNS3 (API REST) · Postman.
