@@ -24,7 +24,6 @@ services:
       GNS3_PROJECT_ID: ${GNS3_PROJECT_ID:-}
       GNS3_USER: ${GNS3_USER:-}
       GNS3_PASSWORD: ${GNS3_PASSWORD:-}
-    command: ["odoo", "--admin-passwd=${ODOO_MASTER_PASSWORD}"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
