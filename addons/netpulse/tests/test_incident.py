@@ -8,221 +8,126 @@ class TestNetpulse(TransactionCase):
         super().setUp()
         group_tech = self.env.ref("netpulse.group_netpulse_technician")
         self.tech = self.env["res.users"].create({
-            "name": "Tec Test", "login": "tec_test", "groups_id": [(6, 0, [group_tech.id])],
+            "name": "Tec Test",
+            "login": "tec_test",
+            "groups_id": [(6, 0, [group_tech.id])],
         })
-        self.sw2 = self.env["netpulse.device"].create({"name": "SW2-T", "criticality": "critical"})
+        self.sw2 = self.env["netpulse.device"].create({
+            "name": "SW2-T",
+            "criticality": "critical",
+        })
 
-    # ------------------------------------------------------------------
-    # Pruebas originales (no modificar)
-    # ------------------------------------------------------------------
+    # Device behavior
 
     def test_critical_down_creates_one_incident(self):
         self.sw2.update_status(False)
-        self.sw2.update_status(False)  # el segundo ciclo no duplica
-        incidents = self.env["netpulse.incident"].search([("device_id", "=", self.sw2.id)])
+        self.sw2.update_status(False)
+
+        incidents = self.env["netpulse.incident"].search([
+            ("device_id", "=", self.sw2.id),
+        ])
         self.assertEqual(len(incidents), 1)
         self.assertEqual(incidents.priority, "2")
         self.assertEqual(incidents.origin, "auto")
 
     def test_normal_device_does_not_create_incident(self):
-        dev = self.env["netpulse.device"].create({"name": "R-normal"})
-        dev.update_status(False)
-        self.assertFalse(self.env["netpulse.incident"].search([("device_id", "=", dev.id)]))
+        device = self.env["netpulse.device"].create({"name": "R-normal"})
 
-    def test_invalid_transition(self):
-        self.sw2.update_status(False)
-        inc = self.env["netpulse.incident"].search([("device_id", "=", self.sw2.id)])
-        inc.technician_id = self.tech
-        with self.assertRaises(ValidationError):
-            inc.write({"state": "resolved"})  # no puede saltar En proceso
-        inc.action_start()
-        inc.action_resolve()
-        self.assertTrue(inc.date_resolved)
+        device.update_status(False)
 
-    def test_technician_cannot_delete_device_or_reassign(self):
-        self.sw2.update_status(False)
-        inc = self.env["netpulse.incident"].search([("device_id", "=", self.sw2.id)])
-        inc.technician_id = self.tech
-        with self.assertRaises(AccessError):
-            self.sw2.with_user(self.tech).unlink()
-        with self.assertRaises(AccessError):
-            inc.with_user(self.tech).write({"priority": "0"})
-
-    # ------------------------------------------------------------------
-    # Nuevas pruebas — Dominio: Device
-    # ------------------------------------------------------------------
+        self.assertFalse(self.env["netpulse.incident"].search([
+            ("device_id", "=", device.id),
+        ]))
 
     def test_device_name_must_be_unique(self):
-        """Crear dos dispositivos con el mismo nombre debe lanzar un error SQL."""
-        # Arrange
         self.env["netpulse.device"].create({"name": "UNIQUE-SW"})
-        # Act & Assert
-        with self.assertRaises(Exception):
-            # La restricción SQL unique(name) provoca IntegrityError que Odoo
-            # envuelve en ValidationError o psycopg2.IntegrityError según el contexto.
+
+        with self.assertRaises(ValidationError):
             self.env["netpulse.device"].create({"name": "UNIQUE-SW"})
 
     def test_device_status_unknown_to_up_sets_up(self):
-        """update_status(True) en un dispositivo con estado desconocido lo pone en 'up'."""
-        # Arrange
-        dev = self.env["netpulse.device"].create({"name": "R-unknown"})
-        self.assertEqual(dev.status, "unknown")
+        device = self.env["netpulse.device"].create({"name": "R-unknown"})
+        self.assertEqual(device.status, "unknown")
 
-        # Act
-        dev.update_status(True)
+        device.update_status(True)
 
-        # Assert
-        self.assertEqual(dev.status, "up")
-
-    def test_device_recovery_posts_message_on_incident(self):
-        """Cuando un dispositivo crítico cae y luego se recupera, la incidencia recibe un mensaje."""
-        # Arrange
-        self.sw2.update_status(False)
-        inc = self.env["netpulse.incident"].search([("device_id", "=", self.sw2.id)], limit=1)
-        messages_before = len(inc.message_ids)
-
-        # Act
-        self.sw2.update_status(True)
-
-        # Assert
-        # note_recovery() llama message_post() en la incidencia abierta,
-        # por lo que message_ids debe haber crecido al menos en 1.
-        self.assertGreater(len(inc.message_ids), messages_before)
-
-    def test_non_critical_device_up_after_down_does_not_create_incident(self):
-        """Un dispositivo normal que pasa de down a up no genera incidencia en ningún momento."""
-        # Arrange
-        dev = self.env["netpulse.device"].create({"name": "R-normal-recovery", "criticality": "normal"})
-
-        # Act
-        dev.update_status(False)
-        dev.update_status(True)
-
-        # Assert
-        self.assertFalse(
-            self.env["netpulse.incident"].search([("device_id", "=", dev.id)])
-        )
-
-    # ------------------------------------------------------------------
-    # Nuevas pruebas — Dominio: Incident
-    # ------------------------------------------------------------------
-
-    def test_incident_name_assigned_from_sequence(self):
-        """Al crear una incidencia, el campo name toma el formato INC-XXXX de la secuencia."""
-        # Arrange & Act
-        self.sw2.update_status(False)
-        inc = self.env["netpulse.incident"].search([("device_id", "=", self.sw2.id)], limit=1)
-
-        # Assert
-        self.assertTrue(inc.name.startswith("INC-"), f"Nombre inesperado: {inc.name!r}")
-
-    def test_incident_requires_technician_to_start(self):
-        """action_start() sin técnico asignado lanza UserError."""
-        # Arrange
-        self.sw2.update_status(False)
-        inc = self.env["netpulse.incident"].search([("device_id", "=", self.sw2.id)], limit=1)
-        self.assertFalse(inc.technician_id)
-
-        # Act & Assert
-        with self.assertRaises(UserError):
-            inc.action_start()
-
-    def test_resolved_incident_sets_date_resolved(self):
-        """Después de resolver una incidencia, date_resolved tiene un valor."""
-        # Arrange
-        self.sw2.update_status(False)
-        inc = self.env["netpulse.incident"].search([("device_id", "=", self.sw2.id)], limit=1)
-        inc.write({"technician_id": self.tech.id})
-        inc.action_start()
-
-        # Act
-        inc.action_resolve()
-
-        # Assert
-        self.assertTrue(inc.date_resolved, "date_resolved debería haberse fijado al resolver.")
-
-    def test_resolved_incident_cannot_reopen(self):
-        """Intentar volver a 'in_progress' desde 'resolved' lanza ValidationError."""
-        # Arrange
-        self.sw2.update_status(False)
-        inc = self.env["netpulse.incident"].search([("device_id", "=", self.sw2.id)], limit=1)
-        inc.write({"technician_id": self.tech.id})
-        inc.action_start()
-        inc.action_resolve()
-        self.assertEqual(inc.state, "resolved")
-
-        # Act & Assert
-        with self.assertRaises(ValidationError):
-            inc.write({"state": "in_progress"})
-
-    def test_duplicate_open_incident_raises_validation_error(self):
-        """Crear manualmente una segunda incidencia abierta para el mismo dispositivo lanza ValidationError."""
-        # Arrange
-        self.sw2.update_status(False)  # crea la primera incidencia automática
-        self.env["netpulse.incident"].search([("device_id", "=", self.sw2.id)], limit=1)
-
-        # Act & Assert
-    def test_assignment_requires_a_netpulse_technician(self):
-        ordinary_user = self.env["res.users"].create({
-            "name": "Usuario sin rol técnico",
-            "login": "ordinary_netpulse_test",
-            "groups_id": [(6, 0, [self.env.ref("base.group_user").id])],
-        })
-        incident = self.env["netpulse.incident"].create({"device_id": self.sw2.id})
-        with self.assertRaises(ValidationError):
-            incident.write({"technician_id": ordinary_user.id})
-
-    def test_technician_creation_forces_safe_defaults_and_self_assignment(self):
-        other_tech = self.env["res.users"].create({
-            "name": "Otro técnico",
-            "login": "other_tech_test",
-            "groups_id": [(6, 0, [self.env.ref("netpulse.group_netpulse_technician").id])],
-        })
-        incident = self.env["netpulse.incident"].with_user(self.tech).create({
-            "device_id": self.sw2.id,
-            "technician_id": other_tech.id,
-            "priority": "2",
-            "state": "resolved",
-            "origin": "auto",
-        })
-        self.assertEqual(incident.technician_id, self.tech)
-        self.assertEqual(incident.priority, "1")
-        self.assertEqual(incident.state, "pending")
-        self.assertEqual(incident.origin, "manual")
-        self.assertFalse(incident.date_resolved)
+        self.assertEqual(device.status, "up")
 
     def test_device_recovery_posts_message_on_incident(self):
         self.sw2.update_status(False)
-        incident = self.env["netpulse.incident"].search(
-            [("device_id", "=", self.sw2.id)], limit=1
-        )
+        incident = self.env["netpulse.incident"].search([
+            ("device_id", "=", self.sw2.id),
+        ], limit=1)
         messages_before = len(incident.message_ids)
 
         self.sw2.update_status(True)
 
         self.assertGreater(len(incident.message_ids), messages_before)
 
-    def test_incident_name_assigned_from_sequence(self):
+    def test_non_critical_device_recovery_does_not_create_incident(self):
+        device = self.env["netpulse.device"].create({
+            "name": "R-normal-recovery",
+            "criticality": "normal",
+        })
+
+        device.update_status(False)
+        device.update_status(True)
+
+        self.assertFalse(self.env["netpulse.incident"].search([
+            ("device_id", "=", device.id),
+        ]))
+
+    def test_technician_cannot_delete_device(self):
+        with self.assertRaises(AccessError):
+            self.sw2.with_user(self.tech).unlink()
+
+    # Incident behavior
+
+    def test_incident_name_is_assigned_from_sequence(self):
         self.sw2.update_status(False)
-        incident = self.env["netpulse.incident"].search(
-            [("device_id", "=", self.sw2.id)], limit=1
-        )
+        incident = self.env["netpulse.incident"].search([
+            ("device_id", "=", self.sw2.id),
+        ], limit=1)
 
         self.assertTrue(incident.name.startswith("INC-"))
 
-    def test_resolved_incident_cannot_reopen(self):
+    def test_incident_requires_technician_to_start(self):
         self.sw2.update_status(False)
-        incident = self.env["netpulse.incident"].search(
-            [("device_id", "=", self.sw2.id)], limit=1
-        )
-        incident.write({"technician_id": self.tech.id})
+        incident = self.env["netpulse.incident"].search([
+            ("device_id", "=", self.sw2.id),
+        ], limit=1)
+        self.assertFalse(incident.technician_id)
+
+        with self.assertRaises(UserError):
+            incident.action_start()
+
+    def test_invalid_transition_cannot_skip_in_progress(self):
+        self.sw2.update_status(False)
+        incident = self.env["netpulse.incident"].search([
+            ("device_id", "=", self.sw2.id),
+        ], limit=1)
+        incident.technician_id = self.tech
+
+        with self.assertRaises(ValidationError):
+            incident.write({"state": "resolved"})
+
+        incident.action_start()
+        incident.action_resolve()
+        self.assertTrue(incident.date_resolved)
+
+    def test_resolved_incident_cannot_be_reopened(self):
+        self.sw2.update_status(False)
+        incident = self.env["netpulse.incident"].search([
+            ("device_id", "=", self.sw2.id),
+        ], limit=1)
+        incident.technician_id = self.tech
         incident.action_start()
         incident.action_resolve()
 
         with self.assertRaises(ValidationError):
             incident.write({"state": "in_progress"})
 
-    def test_duplicate_open_incident_raises_validation_error(self):
+    def test_duplicate_open_incident_is_rejected(self):
         self.sw2.update_status(False)
 
         with self.assertRaises(ValidationError):
@@ -232,117 +137,115 @@ class TestNetpulse(TransactionCase):
                 "priority": "1",
             })
 
-    def test_technician_assigned_as_self_on_manual_create(self):
-        """Un técnico que crea una incidencia manual queda como technician_id automáticamente."""
-        # Arrange
-        dev = self.env["netpulse.device"].create({"name": "SW-manual"})
-
-        # Act
-        # El técnico crea la incidencia en su propio contexto de usuario.
-        inc = self.env["netpulse.incident"].with_user(self.tech).create({
-            "device_id": dev.id,
-            "origin": "manual",
-            "priority": "1",
+    def test_assignment_requires_a_netpulse_technician(self):
+        ordinary_user = self.env["res.users"].create({
+            "name": "Usuario sin rol técnico",
+            "login": "ordinary_netpulse_test",
+            "groups_id": [(6, 0, [self.env.ref("base.group_user").id])],
+        })
+        incident = self.env["netpulse.incident"].create({
+            "device_id": self.sw2.id,
         })
 
-        # Assert
-        self.assertEqual(
-            inc.technician_id.id, self.tech.id,
-            "El técnico que crea la incidencia debería quedar como responsable.",
-        )
+        with self.assertRaises(ValidationError):
+            incident.write({"technician_id": ordinary_user.id})
 
-    def test_priority_values_are_all_valid(self):
-        """Las tres prioridades (0, 1, 2) se pueden asignar sin error."""
-        # Arrange
-        dev = self.env["netpulse.device"].create({"name": "SW-priority-test"})
+    def test_technician_creation_forces_safe_defaults_and_self_assignment(self):
+        other_tech = self.env["res.users"].create({
+            "name": "Otro técnico",
+            "login": "other_tech_test",
+            "groups_id": [(6, 0, [
+                self.env.ref("netpulse.group_netpulse_technician").id,
+            ])],
+        })
 
-        for priority_value in ("0", "1", "2"):
-            # Act
-            inc = self.env["netpulse.incident"].create({
-    def test_priority_values_are_all_valid(self):
-        dev = self.env["netpulse.device"].create({
+        incident = self.env["netpulse.incident"].with_user(self.tech).create({
+            "device_id": self.sw2.id,
+            "technician_id": other_tech.id,
+            "priority": "2",
+            "state": "resolved",
+            "origin": "auto",
+        })
+
+        self.assertEqual(incident.technician_id, self.tech)
+        self.assertEqual(incident.priority, "1")
+        self.assertEqual(incident.state, "pending")
+        self.assertEqual(incident.origin, "manual")
+        self.assertFalse(incident.date_resolved)
+
+    def test_all_priority_values_are_valid(self):
+        device = self.env["netpulse.device"].create({
             "name": "SW-priority-test",
         })
 
-        for priority_value in ("0", "1", "2"):
+        for priority in ("0", "1", "2"):
             incident = self.env["netpulse.incident"].create({
-                "device_id": dev.id,
+                "device_id": device.id,
                 "origin": "manual",
-                "priority": priority_value,
+                "priority": priority,
             })
-            # Assert
-            self.assertEqual(inc.priority, priority_value)
-            # Resolver para liberar el dispositivo para la siguiente iteración.
-            inc.write({"technician_id": self.tech.id})
-            inc.action_start()
-            inc.action_resolve()
+            self.assertEqual(incident.priority, priority)
 
-    def test_incident_is_open_computed_true_when_not_resolved(self):
-        """is_open es True cuando state es 'pending' o 'in_progress'."""
-        # Arrange
-        self.sw2.update_status(False)
-        inc = self.env["netpulse.incident"].search([("device_id", "=", self.sw2.id)], limit=1)
-
-        # Assert — estado inicial pending
-        self.assertEqual(inc.state, "pending")
-        self.assertTrue(inc.is_open)
-
-        # Act — avanzar a in_progress
-        inc.write({"technician_id": self.tech.id})
-        inc.action_start()
-
-        # Assert — sigue abierta
-        self.assertTrue(inc.is_open)
-
-    def test_incident_is_open_computed_false_when_resolved(self):
-        """is_open es False cuando state es 'resolved'."""
-        # Arrange
-        self.sw2.update_status(False)
-        inc = self.env["netpulse.incident"].search([("device_id", "=", self.sw2.id)], limit=1)
-        inc.write({"technician_id": self.tech.id})
-        inc.action_start()
-
-        # Act
-        inc.action_resolve()
-
-        # Assert
-        self.assertFalse(inc.is_open)
-
-    def test_technician_cannot_modify_device_id_on_incident(self):
-        """Un técnico no puede cambiar el device_id de una incidencia que tiene asignada."""
-        # Arrange
-        self.sw2.update_status(False)
-        inc = self.env["netpulse.incident"].search([("device_id", "=", self.sw2.id)], limit=1)
-        inc.write({"technician_id": self.tech.id})
-        other_dev = self.env["netpulse.device"].create({"name": "SW-other"})
-
-        # Act & Assert
-        with self.assertRaises(AccessError):
-            inc.with_user(self.tech).write({"device_id": other_dev.id})
-
-    def test_technician_cannot_modify_origin_on_incident(self):
-        """Un técnico no puede cambiar el campo origin de una incidencia que tiene asignada."""
-        # Arrange
-        self.sw2.update_status(False)
-        inc = self.env["netpulse.incident"].search([("device_id", "=", self.sw2.id)], limit=1)
-        inc.write({"technician_id": self.tech.id})
-
-        # Act & Assert
-        with self.assertRaises(AccessError):
-            inc.with_user(self.tech).write({"origin": "manual"})
-
-            self.assertEqual(incident.priority, priority_value)
-
+            # Resolve each incident before creating the next one for this device.
             incident.write({"technician_id": self.tech.id})
             incident.action_start()
             incident.action_resolve()
 
-    def test_technician_cannot_modify_origin_on_incident(self):
+    def test_is_open_is_true_before_resolution(self):
         self.sw2.update_status(False)
-        incident = self.env["netpulse.incident"].search(
-            [("device_id", "=", self.sw2.id)], limit=1
-        )
-        incident.write({"technician_id": self.tech.id})
+        incident = self.env["netpulse.incident"].search([
+            ("device_id", "=", self.sw2.id),
+        ], limit=1)
+
+        self.assertEqual(incident.state, "pending")
+        self.assertTrue(incident.is_open)
+
+        incident.technician_id = self.tech
+        incident.action_start()
+        self.assertTrue(incident.is_open)
+
+    def test_is_open_is_false_after_resolution(self):
+        self.sw2.update_status(False)
+        incident = self.env["netpulse.incident"].search([
+            ("device_id", "=", self.sw2.id),
+        ], limit=1)
+        incident.technician_id = self.tech
+        incident.action_start()
+        incident.action_resolve()
+
+        self.assertFalse(incident.is_open)
+
+    def test_technician_cannot_reassign_incident(self):
+        self.sw2.update_status(False)
+        incident = self.env["netpulse.incident"].search([
+            ("device_id", "=", self.sw2.id),
+        ], limit=1)
+        incident.technician_id = self.tech
+
+        with self.assertRaises(AccessError):
+            incident.with_user(self.tech).write({"priority": "0"})
+
+    def test_technician_cannot_modify_incident_device(self):
+        self.sw2.update_status(False)
+        incident = self.env["netpulse.incident"].search([
+            ("device_id", "=", self.sw2.id),
+        ], limit=1)
+        incident.technician_id = self.tech
+        other_device = self.env["netpulse.device"].create({
+            "name": "SW-other",
+        })
+
+        with self.assertRaises(AccessError):
+            incident.with_user(self.tech).write({
+                "device_id": other_device.id,
+            })
+
+    def test_technician_cannot_modify_incident_origin(self):
+        self.sw2.update_status(False)
+        incident = self.env["netpulse.incident"].search([
+            ("device_id", "=", self.sw2.id),
+        ], limit=1)
+        incident.technician_id = self.tech
 
         with self.assertRaises(AccessError):
             incident.with_user(self.tech).write({"origin": "manual"})
