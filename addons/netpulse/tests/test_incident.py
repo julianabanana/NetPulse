@@ -1,4 +1,5 @@
 from odoo.exceptions import AccessError, UserError, ValidationError
+from psycopg2 import IntegrityError
 from odoo.tests.common import TransactionCase, tagged
 
 
@@ -42,7 +43,10 @@ class TestNetpulse(TransactionCase):
     def test_device_name_must_be_unique(self):
         self.env["netpulse.device"].create({"name": "UNIQUE-SW"})
 
-        with self.assertRaises(ValidationError):
+        # The SQL UNIQUE constraint raises an IntegrityError. Use a savepoint
+        # so the expected database error does not leave the test transaction
+        # in an aborted state.
+        with self.assertRaises(IntegrityError), self.cr.savepoint():
             self.env["netpulse.device"].create({"name": "UNIQUE-SW"})
 
     def test_device_status_unknown_to_up_sets_up(self):
@@ -249,3 +253,4 @@ class TestNetpulse(TransactionCase):
 
         with self.assertRaises(AccessError):
             incident.with_user(self.tech).write({"origin": "manual"})
+
