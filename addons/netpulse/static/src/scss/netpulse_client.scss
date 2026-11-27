@@ -1,0 +1,25 @@
+.o_netpulse_client {
+    max-height: calc(100vh - 112px);
+    max-height: calc(100dvh - 112px);
+    min-height: 320px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scrollbar-gutter: stable;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2rem;
+}
+
+.o_netpulse_client .card,
+.o_netpulse_client .list-group {
+    min-width: 0;
+}
+
+@media (max-width: 767.98px) {
+    .o_netpulse_client {
+        max-height: calc(100vh - 96px);
+        max-height: calc(100dvh - 96px);
+        min-height: 240px;
+        padding-inline: 0.75rem;
+    }
+}

@@ -1,4 +1,4 @@
-# NetPulse — Prototipo 1 
+# NetPulse — Prototipo 2 (en desarrollo)
 
 Ingeniería de Software II (2016702) · Universidad Nacional de Colombia · Sede Bogotá · 2026-II
 
@@ -13,45 +13,68 @@ asigna a un técnico y el técnico la lleva de *Pendiente → En proceso → Res
 - Documentación de la API: [`docs/openapi.yaml`](docs/openapi.yaml) (pegar en https://editor.swagger.io)
 - Tablero (GitHub Projects): [`Git-project`](https://github.com/users/Fmoram/projects/2)
 - Documento PDF del Prototipo 1: Raíz del repositorio
+- [Trazabilidad de historias y pruebas](docs/traceability.md)
+- [Plantilla de evidencia de depuración](docs/debugging-evidence.md)
 
 ## Tecnologías
-Odoo 17 Community (Python, ORM, vistas XML) · PostgreSQL 15 · Docker Compose · GNS3 (API REST) · Postman.
+Odoo 17 Community (Python, ORM, OWL/XML) · API HTTP con JWT · PostgreSQL 15 · Docker Compose · GNS3 (API REST).
 
 ## Ejecutar en local
 Requisitos: Docker y Docker Compose.
 
 ```bash
 cp .env.example .env            # edite las claves (nunca suba .env)
+# Genere un secreto JWT propio; no use el valor de ejemplo:
+sed -i 's|^NETPULSE_JWT_SECRET=.*|NETPULSE_JWT_SECRET='"$(openssl rand -hex 32)"'|' .env
 docker compose up -d db
 # Primera vez: crea la base "netpulse" e instala el módulo con datos de demostración
 docker compose run --rm odoo odoo -d netpulse -i netpulse --stop-after-init
 docker compose up -d
 ```
+
 Abra http://localhost:8069 e ingrese con `admin` (la base creada por línea de comandos usa la contraseña
 `admin`: **cámbiela de inmediato** en Preferencias → Seguridad de la cuenta).
+
+La lista de bases de datos está deshabilitada en `config/odoo.conf`; la inicialización y actualización
+del módulo se realizan mediante los comandos Docker documentados abajo.
 
 Para actualizar el módulo tras cambios de código:
 `docker compose run --rm odoo odoo -d netpulse -u netpulse --stop-after-init`
 
-Pruebas automáticas del módulo (en una base aparte):
-`docker compose run --rm odoo odoo -d netpulse_test -i netpulse --test-enable --stop-after-init`
+Ejecutar todas las pruebas (cliente, dominio, aplicación, ORM e integración HTTP) desde un clon limpio:
+
+```bash
+bash scripts/test_all.sh
+```
+
+El script usa Node 20 y la imagen Odoo 17, inicia PostgreSQL y crea/actualiza la base
+`netpulse_test`. Genera el reporte HTML de cobertura en `addons/netpulse/coverage_html/`.
+
+Inventario implementado: 21 pruebas unitarias puras de backend (incluye 5 casos de uso
+con dobles), 12 pruebas HTTP de integración de backend, 2 pruebas unitarias de presentación
+y 3 pruebas de integración del cliente HTTP. Además, hay 11 pruebas ORM de Odoo para
+permisos, incidencias y creación de usuarios. Los resultados definitivos se consultan en CI.
+Para ejecutar solo las pruebas del cliente: `npm run test:client`.
 
 ## Variables de entorno (valores de ejemplo en `.env.example`)
 | Variable | Uso |
 |---|---|
 | `POSTGRES_USER`, `POSTGRES_PASSWORD` | Credenciales de PostgreSQL |
-| `ODOO_MASTER_PASSWORD` | Contraseña maestra de Odoo |
+| `NETPULSE_JWT_SECRET` | Secreto aleatorio de al menos 32 bytes para firmar JWT |
 | `GNS3_URL`, `GNS3_PROJECT_ID` | Servidor y proyecto GNS3 a monitorear |
 | `GNS3_USER`, `GNS3_PASSWORD` | Opcionales, si su GNS3 exige autenticación |
 
-## Roles
+## Roles y administración de usuarios
 | Rol | Puede |
 |---|---|
-| **Administrador** | Todo: dashboard, topología, CRUD de dispositivos e incidencias, asignar técnico y prioridad, sincronizar con GNS3 |
-| **Técnico** | Ver dispositivos; ver, crear y atender **solo sus** incidencias; no elimina ni reasigna ni cambia prioridad |
+| **Administrador** | Dashboard, topología, CRUD de dispositivos e incidencias, asignar técnicos, cambiar prioridad, sincronizar con GNS3 y crear usuarios Administrador/Técnico |
+| **Técnico** | Consultar dispositivos; consultar, crear y atender sus propias incidencias. No puede asignar, cambiar prioridad, cambiar el origen ni eliminar dispositivos/incidencias |
 
-Cree el usuario técnico en Ajustes → Usuarios (el de demostración `tecnico@netpulse.local` viene **sin contraseña**:
-asígnela con Acción → Cambiar contraseña).
+La asignación de una incidencia valida en el servidor que el usuario seleccionado tenga rol Técnico y no sea administrador. Al crear incidencias, el sistema fuerza los valores seguros según el rol; un técnico queda como responsable de su propia incidencia, que comienza Pendiente, con prioridad Media y origen Manual.
+
+Los administradores pueden crear cuentas desde **NetPulse → Configuración → Crear usuario**. El formulario permite elegir el rol Administrador o Técnico y establecer una contraseña inicial de al menos 10 caracteres. El identificador de acceso debe ser único. El asistente solo está disponible para administradores de NetPulse.
+
+El usuario técnico de demostración `tecnico@netpulse.local` viene **sin contraseña**: asígnela desde Ajustes → Usuarios → Acción → Cambiar contraseña, o cree una cuenta nueva desde NetPulse.
 
 ## Guion de demostración (5 minutos)
 1. **Dashboard / Topología:** dispositivos verdes (activos) y rojos (caídos).
@@ -69,16 +92,42 @@ asígnela con Acción → Cambiar contraseña).
 - Si Odoo está en la nube y GNS3 en su computador, use [`scripts/gns3_push_monitor.py`](scripts/gns3_push_monitor.py).
 - Sin GNS3 disponible, use los botones *Simular caída / recuperación* (solo administrador).
 
-## API y pruebas (Postman)
-Importe `postman/NetPulse.postman_collection.json` y `postman/NetPulse.postman_environment.json`.
-Cree una **API key** para el administrador y otra para el técnico (Preferencias → Seguridad de la cuenta → Nueva clave de API)
-y péguelas en el environment (variables `admin_api_key`, `tech_api_key`; **no las suba al repositorio**).
-Ejecute la colección completa con el Collection Runner (17 peticiones: login, CRUD, credencial inválida,
-rol insuficiente, datos inválidos).
+## Cliente OWL y API JWT
 
-Equivalencias frente a la guía: Odoo responde con HTTP 200 y el error en el cuerpo —
-`AccessDenied` ≈ 401, `AccessError` ≈ 403, `ValidationError` ≈ 400. No hay JWT nativo: la autenticación es por
-sesión/API key (almacenadas con hash); opcionalmente puede añadirse el módulo OCA `auth_jwt`.
+El menú **NetPulse → Incidencias → Cliente NetPulse** abre el cliente web OWL integrado
+en Odoo. La vista no accede directamente al ORM: utiliza un cliente HTTP dedicado que
+consume los endpoints versionados de la API.
+
+- `POST /api/v1/auth/login`: valida usuario y contraseña de Odoo y devuelve un JWT HS256.
+- `GET /api/v1/incidents`: lista las incidencias visibles para el usuario.
+- `GET /api/v1/devices`: lista los dispositivos activos que pueden vincularse al crear una incidencia.
+- `GET /api/v1/incidents/{id}`: consulta el detalle de una incidencia.
+- `POST /api/v1/incidents`: crea una incidencia y devuelve HTTP 201.
+- `PATCH /api/v1/incidents/{id}/state`: avanza el estado según las reglas del dominio.
+
+Las rutas protegidas requieren `Authorization: Bearer <token>`. El JWT expira en 30 minutos
+y el cliente lo conserva únicamente en memoria; al recibir 401 se elimina y se solicita
+iniciar sesión otra vez. Un 403 muestra un mensaje de permiso insuficiente. El secreto de
+firma se lee de `NETPULSE_JWT_SECRET`; nunca se guarda en Git ni en la base de datos.
+
+Ejemplo de inicio de sesión:
+
+```bash
+curl -i http://localhost:8069/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"login":"admin","password":"TU_CLAVE"}'
+```
+
+Copie el campo `access_token` de la respuesta para probar una ruta protegida:
+
+```bash
+curl -i http://localhost:8069/api/v1/incidents \
+  -H "Authorization: Bearer TU_TOKEN"
+```
+
+La especificación OpenAPI está en [docs/openapi.yaml](docs/openapi.yaml). La colección
+Postman del Prototipo 1 conserva las llamadas JSON-RPC para administración e inspección
+directa de Odoo; esas llamadas no son el mecanismo JWT utilizado por el nuevo cliente.
 
 ## HTTPS
 Para producción ponga Odoo detrás de Caddy o Nginx con certificado Let's Encrypt, active `proxy_mode = True`
@@ -91,7 +140,8 @@ netpulse.example.com {
 
 ## Estructura
 ```
-addons/netpulse/   módulo Odoo (models, views, security, data, demo, tests)
+addons/netpulse/   módulo Odoo (models, services, controllers, static OWL, views, security, tests)
+addons/netpulse_core/   dominio, casos de uso y servicio JWT puros
 config/odoo.conf   list_db=False, dbfilter, proxy_mode
 docs/openapi.yaml  especificación OpenAPI 3
 postman/           colección y environment (sin llaves)

@@ -12,8 +12,13 @@ filestore/
 pgdata/
 odoo-data/
 # IDE / SO
-.vscode/
+.vscode/*
+!.vscode/launch.json
 .idea/
 .DS_Store
 # Postman: nunca versionar entornos con llaves reales
 postman/*.local.json
+# Coverage reports
+.coverage
+coverage_html/
+addons/netpulse/coverage_html/
