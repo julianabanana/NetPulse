@@ -1,0 +1,8 @@
+{
+  "name": "netpulse-client-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:client": "node --test addons/netpulse/tests/client/*.test.js"
+  }
+}

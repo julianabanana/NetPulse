@@ -10,6 +10,9 @@
 
     <menuitem id="menu_netpulse_incidents" name="Incidencias" parent="menu_netpulse_root"
               sequence="30"/>
+    <menuitem id="menu_netpulse_client" name="Cliente NetPulse"
+              parent="menu_netpulse_incidents" action="action_netpulse_incident_client"
+              sequence="5"/>
     <menuitem id="menu_netpulse_incident_inbox" name="Bandeja de incidencias"
               parent="menu_netpulse_incidents" action="action_netpulse_incident" sequence="10"/>
     <menuitem id="menu_netpulse_incident_mine" name="Mis incidencias"
@@ -20,6 +23,9 @@
 
     <menuitem id="menu_netpulse_config" name="Configuración" parent="menu_netpulse_root"
               sequence="90" groups="group_netpulse_admin"/>
+    <menuitem id="menu_netpulse_create_user" name="Crear usuario"
+              parent="menu_netpulse_config" action="action_netpulse_create_user" sequence="10"
+              groups="group_netpulse_admin"/>
     <menuitem id="menu_netpulse_sync" name="Sincronizar con GNS3" parent="menu_netpulse_config"
-              action="action_netpulse_sync_gns3" sequence="10"/>
+              action="action_netpulse_sync_gns3" sequence="20"/>
 </odoo>
